@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>과목별 공부자료실</title>
+<link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: one 720px column. A sticky row of binder tabs picks the subject; materials sit below as a ruled list of sheets. */
+  --paper:#f3f5f9; --surface:#ffffff; --ink:#15233d; --muted:#5a6781; --line:#d6dce7;
+  --mark:#ffe55e; --accent:#1d4fd7; --on-accent:#ffffff; --ok:#17794a; --warn:#a9481a;
+  --font-display:"Gothic A1","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#0f141d; --surface:#171f2e; --ink:#e7ecf5; --muted:#98a5bc; --line:#2a364f;
+    --mark:#6b5a00; --accent:#86a8ff; --on-accent:#0f141d; --ok:#5fd09a; --warn:#f0a070;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.6}
+[hidden]{display:none !important}
+.wrap{max-width:720px; margin:0 auto; padding:0 16px 64px}
+header.top{padding:28px 0 14px}
+.headrow{display:flex; gap:12px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap}
+h1{font-family:var(--font-display); font-weight:800; font-size:28px; line-height:1.25; margin:0 0 6px; text-wrap:balance; letter-spacing:-0.01em}
+h1 span{background:linear-gradient(transparent 58%, var(--mark) 58%); padding:0 2px}
+.lede{margin:0; color:var(--muted); font-size:15px}
+.status{margin:14px 0 0; padding:10px 12px; border-left:4px solid var(--accent); background:var(--surface); font-size:14.5px; border-radius:0 6px 6px 0}
+.status.used{border-left-color:var(--warn)}
+.status.owner{border-left-color:var(--ok)}
+
+.gate{margin:28px 0 0; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:22px 18px; display:flex; flex-direction:column; gap:14px; max-width:420px}
+.gate h2{font-family:var(--font-display); font-size:20px; margin:0; text-wrap:balance}
+.gate p{margin:0; font-size:14.5px; color:var(--muted)}
+.gate .msg{min-height:1.4em; color:var(--warn)}
+.pin{font:500 26px var(--font-mono); letter-spacing:.5em; text-align:center; width:100%; padding:10px 8px; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:8px}
+
+nav.tabs{position:sticky; top:0; z-index:5; background:var(--paper); margin:0 -16px; padding:10px 16px 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+.tabrow{display:flex; gap:4px; width:max-content}
+.tab{display:inline-flex; align-items:baseline; gap:6px; white-space:nowrap; padding:8px 12px 9px; border:1px solid var(--line); border-bottom:none; border-radius:8px 8px 0 0; background:transparent; color:var(--muted); font:500 14.5px var(--font-body); text-decoration:none}
+.tab .n{font:400 12px var(--font-mono); font-variant-numeric:tabular-nums}
+.tab[aria-current="page"]{background:var(--surface); color:var(--ink); font-weight:600; box-shadow:inset 0 -4px 0 var(--mark)}
+
+.post{margin:18px 0 0; background:var(--surface); border:1px solid var(--line); border-radius:8px}
+.post summary{cursor:pointer; padding:12px 14px; font-weight:600; font-size:15.5px}
+.post form{display:flex; flex-direction:column; gap:14px; padding:4px 14px 16px}
+.field{display:flex; flex-direction:column; gap:5px}
+label, legend{font-size:13.5px; font-weight:600; color:var(--muted)}
+input[type="text"], input[type="url"], select, textarea{width:100%; font:inherit; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:9px 10px}
+input[type="file"]{font:inherit; font-size:14px; color:var(--ink); max-width:100%}
+textarea{resize:vertical; min-height:96px}
+fieldset{border:1px dashed var(--line); border-radius:6px; margin:0; padding:10px 12px 12px; display:flex; flex-direction:column; gap:12px}
+.kinds{display:flex; gap:16px; flex-wrap:wrap}
+.kinds label{display:inline-flex; gap:6px; align-items:center; font-weight:500; color:var(--ink); font-size:14.5px}
+.hint{margin:0; font-size:13px; color:var(--muted)}
+#formMsg{margin:0; min-height:1.4em; font-size:14px; color:var(--muted)}
+#formMsg.err{color:var(--warn)}
+
+.row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; font:600 14.5px var(--font-body); color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:9px 14px; min-height:42px; cursor:pointer; text-decoration:none}
+.btn .sub{font:400 12px var(--font-mono); opacity:.85}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--on-accent)}
+.btn.quiet{border-color:transparent; background:transparent; color:var(--muted); padding:9px 8px}
+.btn.danger{color:var(--warn)}
+.btn:disabled{opacity:.5; cursor:not-allowed}
+:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+
+#list{display:flex; flex-direction:column; gap:12px; margin-top:18px}
+.sheet{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px 14px 12px; display:flex; flex-direction:column; gap:8px}
+.meta{display:flex; gap:10px; flex-wrap:wrap; align-items:center; font:400 12.5px var(--font-mono); color:var(--muted)}
+.tag{font:600 12.5px var(--font-body); color:var(--ink); background:var(--mark); padding:1px 7px; border-radius:3px}
+.pill{font:600 12px var(--font-body); color:var(--ok); border:1px solid currentColor; border-radius:99px; padding:0 8px}
+.sheet h2{font-family:var(--font-display); font-weight:700; font-size:18.5px; line-height:1.35; margin:0; text-wrap:balance; overflow-wrap:anywhere}
+.desc{margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:15px; max-width:65ch}
+.note{margin:0; font-size:13px; color:var(--warn)}
+.sheet .row{margin-top:4px}
+.sheet .owner-row{border-top:1px dashed var(--line); padding-top:6px; margin-top:6px}
+.empty{margin:0; padding:28px 16px; text-align:center; color:var(--muted); border:1px dashed var(--line); border-radius:8px; font-size:15px}
+
+dialog{border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); padding:18px; width:min(92vw, 380px)}
+dialog::backdrop{background:rgba(10,16,28,.55)}
+dialog h2{font-family:var(--font-display); font-size:18px; margin:0 0 6px}
+dialog p{margin:0 0 16px; font-size:14.5px; color:var(--muted); overflow-wrap:anywhere}
+dialog .row{justify-content:flex-end}
+dialog .field{margin-bottom:12px}
+#toast{position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:10px 14px; border-radius:8px; font-size:14.5px; max-width:min(92vw, 520px); z-index:20}
+@media (max-width:400px){ h1{font-size:24px} .sheet .btn{width:100%} .sheet .btn.quiet{width:auto} }
+@media (prefers-reduced-motion:reduce){ *{scroll-behavior:auto !important; transition:none !important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="headrow">
+      <h1><span>과목별 공부자료실</span></h1>
+      <div class="row" id="accountRow" hidden>
+        <button type="button" class="btn quiet" id="btnChangePin">비밀번호 변경</button>
+        <button type="button" class="btn quiet" id="btnLogout">로그아웃</button>
+      </div>
+    </div>
+    <p class="lede">직접 만든 정리 자료와 문제를 과목별로 모았어요. 자료마다 답지가 함께 있어요.</p>
+    <p id="status" class="status" role="status" hidden></p>
+  </header>
+
+  <section id="viewLoading" class="gate"><p>자료실을 여는 중이에요.</p></section>
+
+  <section id="viewLogin" class="gate" hidden>
+    <h2>Google 계정으로 로그인해 주세요</h2>
+    <p>로그인한 뒤 4자리 비밀번호를 입력하면 자료를 볼 수 있어요.</p>
+    <button type="button" class="btn primary" id="btnGoogle">Google 계정으로 로그인</button>
+    <p class="msg" id="loginMsg" role="status"></p>
+  </section>
+
+  <section id="viewPin" class="gate" hidden>
+    <h2 id="pinTitle">비밀번호 4자리를 입력해 주세요</h2>
+    <p id="pinHelp"></p>
+    <form id="pinForm" novalidate>
+      <div class="field">
+        <label for="pin1" id="pin1Label">비밀번호</label>
+        <input class="pin" id="pin1" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
+      </div>
+      <div class="field" id="pin2Wrap" hidden style="margin-top:12px">
+        <label for="pin2">한 번 더 입력</label>
+        <input class="pin" id="pin2" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
+      </div>
+      <p class="msg" id="pinMsg" role="status" style="margin-top:10px"></p>
+      <div class="row">
+        <button type="submit" class="btn primary" id="pinSubmit">들어가기</button>
+        <button type="button" class="btn quiet" id="pinLogout">다른 계정으로 로그인</button>
+      </div>
+    </form>
+  </section>
+
+  <div id="viewApp" hidden>
+    <nav class="tabs" aria-label="과목"><div class="tabrow" id="tabs"></div></nav>
+
+    <details id="postBox" class="post" hidden>
+      <summary id="postSummary">새 자료 게시</summary>
+      <form id="postForm" novalidate>
+        <div class="field"><label for="fSubject">과목</label><select id="fSubject"></select></div>
+        <div class="field"><label for="fTitle">제목</label><input id="fTitle" type="text" maxlength="80" autocomplete="off"></div>
+        <div class="field">
+          <label for="fDesc">자료 설명</label>
+          <textarea id="fDesc" rows="4" maxlength="2000" placeholder="범위, 난이도, 어떻게 쓰면 좋은지 적어 주세요."></textarea>
+        </div>
+        <fieldset id="fileSection">
+          <legend>자료와 답지</legend>
+          <div class="kinds">
+            <label for="fKindFile"><input type="radio" name="fKind" id="fKindFile" value="file" checked> 파일 올리기</label>
+            <label for="fKindLink"><input type="radio" name="fKind" id="fKindLink" value="link"> 아티팩트 링크</label>
+          </div>
+          <div class="field" id="fileWrap">
+            <label for="fFile">자료 파일</label>
+            <input id="fFile" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp,.md,.txt">
+            <p class="hint">PDF, HTML, 이미지, 텍스트 파일. 파일 하나에 50MB까지.</p>
+          </div>
+          <div class="field" id="linkWrap" hidden>
+            <label for="fLink">아티팩트 링크</label>
+            <input id="fLink" type="url" placeholder="https://claude.ai/..." autocomplete="off">
+            <p class="hint">링크를 받은 사람이 열 수 있게 그 아티팩트의 공유 설정을 먼저 확인해 주세요.</p>
+          </div>
+          <div class="field">
+            <label for="fAnswer">답지 파일 (없으면 비워 두기)</label>
+            <input id="fAnswer" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp,.md,.txt">
+          </div>
+        </fieldset>
+        <p id="formMsg" role="status"></p>
+        <div class="row">
+          <button type="submit" id="fSubmit" class="btn primary">게시하기</button>
+          <button type="button" id="fCancel" class="btn" hidden>수정 취소</button>
+        </div>
+      </form>
+    </details>
+
+    <main id="list" aria-live="polite"></main>
+  </div>
+</div>
+
+<dialog id="askDlg" aria-labelledby="askTitle">
+  <h2 id="askTitle"></h2>
+  <p id="askBody"></p>
+  <div class="row">
+    <button type="button" id="askNo" class="btn">취소</button>
+    <button type="button" id="askYes" class="btn primary">확인</button>
+  </div>
+</dialog>
+
+<dialog id="pinDlg" aria-labelledby="pinDlgTitle">
+  <h2 id="pinDlgTitle">비밀번호 변경</h2>
+  <form id="pinDlgForm" novalidate>
+    <div class="field"><label for="cpOld">지금 비밀번호</label><input class="pin" id="cpOld" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+    <div class="field"><label for="cpNew">새 비밀번호 (숫자 4자리)</label><input class="pin" id="cpNew" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+    <p id="cpMsg" role="status" style="color:var(--warn); min-height:1.4em"></p>
+    <div class="row">
+      <button type="button" id="cpCancel" class="btn">취소</button>
+      <button type="submit" class="btn primary">변경</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+/* These two values are public by design: every rule (who may post, who may download, the weekly limit, the PIN) is enforced on the server. */
+var SUPABASE_URL = "https://ajzzehxkdodtmfpttifh.supabase.co";
+var SUPABASE_KEY = "sb_publishable_LaGhJ6_Pybpa69VOCXrNmQ_HpRS8lNR";
+var BUCKET = "materials";
+
+var SUBJECTS = [
+  {id:"korean", name:"국어"}, {id:"english", name:"영어"}, {id:"calculus2", name:"미적분2"},
+  {id:"geometry", name:"기하"}, {id:"matter-energy", name:"물질과 에너지"}, {id:"mechanics-energy", name:"역학과 에너지"}
+];
+var FILE_TYPES = {
+  pdf:"application/pdf", html:"text/html", htm:"text/html", png:"image/png",
+  jpg:"image/jpeg", jpeg:"image/jpeg", webp:"image/webp", md:"text/markdown", txt:"text/plain"
+};
+var MAX_BYTES = 50 * 1024 * 1024;
+
+var sb = null;
+var state = {
+  isAdmin:false, pinMode:"verify", materials:[], links:{}, counts:{},
+  received:{}, used:0, limit:1, nextReset:null, busy:false, editingId:null, postBoxSet:false
+};
+
+function $(id){ return document.getElementById(id); }
+function el(tag, attrs){
+  var n = document.createElement(tag), k;
+  if (attrs) for (k in attrs){
+    var v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "text") n.textContent = v;
+    else if (k.slice(0,2) === "on") n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (var i = 2; i < arguments.length; i++){
+    var c = arguments[i];
+    if (c == null || c === false) continue;
+    n.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return n;
+}
+function show(view){
+  ["viewLoading","viewLogin","viewPin","viewApp"].forEach(function(v){ $(v).hidden = (v !== view); });
+  $("accountRow").hidden = (view !== "viewApp");
+  $("status").hidden = (view !== "viewApp");
+}
+var toastTimer = 0;
+function toast(msg){
+  var t = $("toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.hidden = true; }, 5000);
+}
+function ask(title, body, yesLabel){
+  return new Promise(function(resolve){
+    var dlg = $("askDlg"), yes = $("askYes"), no = $("askNo"), done = false;
+    $("askTitle").textContent = title; $("askBody").textContent = body || ""; yes.textContent = yesLabel || "확인";
+    function finish(v){
+      if (done) return; done = true;
+      yes.removeEventListener("click", onYes); no.removeEventListener("click", onNo);
+      dlg.removeEventListener("cancel", onNo); dlg.removeEventListener("close", onNo);
+      try { if (dlg.open) dlg.close(); } catch (e) { dlg.removeAttribute("open"); }
+      resolve(v);
+    }
+    function onYes(){ finish(true); } function onNo(){ finish(false); }
+    yes.addEventListener("click", onYes); no.addEventListener("click", onNo);
+    dlg.addEventListener("cancel", onNo); dlg.addEventListener("close", onNo);
+    try { dlg.showModal(); } catch (e) { dlg.setAttribute("open", ""); }
+  });
+}
+function fmtDay(iso){
+  try { return new Intl.DateTimeFormat("ko-KR", {timeZone:"Asia/Seoul", month:"long", day:"numeric"}).format(new Date(iso)); }
+  catch (e) { return ""; }
+}
+function resetText(){ return state.nextReset ? fmtDay(state.nextReset) + "(월) 0시" : "다음 주 월요일 0시"; }
+function fmtDate(iso){
+  try { return new Intl.DateTimeFormat("ko-KR", {timeZone:"Asia/Seoul", year:"numeric", month:"2-digit", day:"2-digit"}).format(new Date(iso)); }
+  catch (e) { return ""; }
+}
+function fmtTime(iso){
+  try { return new Intl.DateTimeFormat("ko-KR", {timeZone:"Asia/Seoul", hour:"numeric", minute:"2-digit"}).format(new Date(iso)); }
+  catch (e) { return ""; }
+}
+function fmtSize(b){
+  b = Number(b);
+  if (!(b > 0)) return "";
+  if (b < 1024 * 1024) return Math.max(1, Math.round(b / 1024)) + "KB";
+  return (b / 1024 / 1024).toFixed(1) + "MB";
+}
+function safeUrl(s){
+  try { var u = new URL(String(s)); return u.protocol === "https:" ? u.href : null; } catch (e) { return null; }
+}
+function currentSubject(){
+  var h = (location.hash || "").replace(/^#/, "");
+  for (var i = 0; i < SUBJECTS.length; i++) if (SUBJECTS[i].id === h) return h;
+  return "";
+}
+function subjectName(id){
+  for (var i = 0; i < SUBJECTS.length; i++) if (SUBJECTS[i].id === id) return SUBJECTS[i].name;
+  return "기타";
+}
+function needsPin(error){
+  if (!error) return false;
+  var m = String(error.message || "");
+  return error.code === "42501" && m.indexOf("pin required") >= 0;
+}
+
+/* ---------- login and PIN ---------- */
+async function signIn(){
+  $("loginMsg").textContent = "";
+  if (location.protocol === "file:"){ $("loginMsg").textContent = "파일을 직접 열어서는 로그인할 수 없어요. 사이트 주소로 접속해 주세요."; return; }
+  var res = await sb.auth.signInWithOAuth({provider:"google", options:{redirectTo: location.origin + location.pathname}});
+  if (res.error) $("loginMsg").textContent = "Google 로그인을 시작하지 못했어요. 운영자에게 알려 주세요. (" + res.error.message + ")";
+}
+async function signOut(){
+  try { await sb.auth.signOut(); } catch (e) {}
+  state.materials = []; state.links = {}; state.received = {}; state.isAdmin = false;
+  show("viewLogin");
+}
+function setPinMode(mode, lockedUntil){
+  state.pinMode = mode;
+  $("pin1").value = ""; $("pin2").value = ""; $("pinMsg").textContent = "";
+  $("pin2Wrap").hidden = (mode !== "set");
+  if (mode === "set"){
+    $("pinTitle").textContent = "비밀번호 4자리를 정해 주세요";
+    $("pinHelp").textContent = "숫자 4자리예요. 다음부터 들어올 때마다 입력해요.";
+    $("pin1Label").textContent = "새 비밀번호";
+    $("pinSubmit").textContent = "저장하고 들어가기";
+  } else {
+    $("pinTitle").textContent = "비밀번호 4자리를 입력해 주세요";
+    $("pinHelp").textContent = "처음 정한 숫자 4자리예요.";
+    $("pin1Label").textContent = "비밀번호";
+    $("pinSubmit").textContent = "들어가기";
+  }
+  if (lockedUntil) $("pinMsg").textContent = "5번 틀려서 잠겼어요. " + fmtTime(lockedUntil) + " 이후에 다시 시도해 주세요.";
+  show("viewPin");
+  try { $("pin1").focus(); } catch (e) {}
+}
+async function afterLogin(){
+  var res = await sb.rpc("pin_status");
+  if (res.error){ $("loginMsg").textContent = "로그인 상태를 확인하지 못했어요. 다시 로그인해 주세요."; show("viewLogin"); return; }
+  state.isAdmin = !!res.data.is_admin;
+  setPinMode(res.data.has_pin ? "verify" : "set", res.data.locked_until);
+}
+async function onPinSubmit(ev){
+  ev.preventDefault();
+  if (state.busy) return;
+  var p1 = $("pin1").value.trim(), p2 = $("pin2").value.trim(), msg = $("pinMsg");
+  if (!/^[0-9]{4}$/.test(p1)){ msg.textContent = "숫자 4자리를 입력해 주세요."; return; }
+  if (state.pinMode === "set" && p1 !== p2){ msg.textContent = "두 번 입력한 숫자가 달라요."; return; }
+  state.busy = true; $("pinSubmit").disabled = true; msg.textContent = "";
+  try {
+    var res = await sb.rpc(state.pinMode === "set" ? "set_pin" : "verify_pin", {p_pin:p1});
+    if (res.error) throw res.error;
+    var d = res.data || {};
+    if (d.ok){ $("pin1").value = ""; $("pin2").value = ""; await enterApp(); return; }
+    if (d.reason === "wrong") msg.textContent = "비밀번호가 달라요. " + d.attempts_left + "번 더 틀리면 15분 동안 잠겨요.";
+    else if (d.reason === "locked") msg.textContent = "5번 틀려서 잠겼어요. " + fmtTime(d.locked_until) + " 이후에 다시 시도해 주세요.";
+    else if (d.reason === "exists") setPinMode("verify");
+    else if (d.reason === "no_pin") setPinMode("set");
+    else msg.textContent = "숫자 4자리를 입력해 주세요.";
+    $("pin1").value = ""; $("pin2").value = "";
+  } catch (e) { msg.textContent = "확인하지 못했어요. 잠시 뒤 다시 시도해 주세요."; }
+  finally { state.busy = false; $("pinSubmit").disabled = false; }
+}
+
+/* ---------- data ---------- */
+async function loadQuota(){
+  var q = await sb.rpc("my_quota");
+  if (q.error) throw q.error;
+  state.used = q.data.used || 0; state.limit = q.data.weekly_limit || 1; state.nextReset = q.data.next_reset;
+  state.isAdmin = !!q.data.is_admin;
+  state.received = {};
+  (q.data.received || []).forEach(function(id){ state.received[id] = true; });
+}
+async function loadAll(){
+  var got = await Promise.all([
+    sb.from("materials").select("*").order("created_at", {ascending:false}),
+    sb.from("material_links").select("material_id,url"),
+    loadQuota()
+  ]);
+  if (got[0].error) throw got[0].error;
+  state.materials = got[0].data || [];
+  state.links = {};
+  ((got[1] && got[1].data) || []).forEach(function(r){ state.links[r.material_id] = r.url; });
+  state.counts = {};
+  if (state.isAdmin){
+    var c = await sb.rpc("download_counts");
+    if (!c.error && c.data) state.counts = c.data;
+  }
+}
+async function enterApp(){
+  show("viewLoading");
+  try { await loadAll(); }
+  catch (e) {
+    if (needsPin(e)){ setPinMode("verify"); return; }
+    show("viewApp"); renderAll();
+    $("list").replaceChildren(el("p", {class:"empty", text:"자료 목록을 불러오지 못했어요. 페이지를 새로 고쳐 주세요."}));
+    return;
+  }
+  $("postBox").hidden = !state.isAdmin;
+  if (state.isAdmin && !state.postBoxSet){ state.postBoxSet = true; if (!state.materials.length) $("postBox").open = true; }
+  var cur = currentSubject(); if (cur) $("fSubject").value = cur;
+  show("viewApp"); renderAll();
+}
+async function refresh(){
+  try { await loadAll(); renderAll(); }
+  catch (e) { if (needsPin(e)) setPinMode("verify"); }
+}
+
+/* ---------- rendering ---------- */
+function hasReceived(m){ return state.received[m.id] === true; }
+function canGet(m){ return state.isAdmin || hasReceived(m) || state.used < state.limit; }
+function renderStatus(){
+  var s = $("status"); s.className = "status";
+  if (state.isAdmin){ s.textContent = "운영자로 들어왔어요. 자료를 게시, 수정, 삭제할 수 있고 다운로드 횟수 제한이 없어요."; s.classList.add("owner"); return; }
+  var left = state.limit - state.used;
+  if (left > 0) s.textContent = "이번 주에 자료를 " + left + "개 받을 수 있어요. 답지는 횟수와 상관없이 받을 수 있어요.";
+  else { s.textContent = "이번 주 다운로드를 사용했어요. " + resetText() + "에 다시 1개를 받을 수 있어요. 이미 받은 자료와 답지는 계속 받을 수 있어요."; s.classList.add("used"); }
+}
+function renderTabs(){
+  var cur = currentSubject(), row = $("tabs"), counts = {};
+  state.materials.forEach(function(m){ counts[m.subject] = (counts[m.subject] || 0) + 1; });
+  row.replaceChildren();
+  row.appendChild(el("a", {class:"tab", href:"#all", "aria-current": cur ? null : "page"}, "전체", el("span", {class:"n", text:String(state.materials.length)})));
+  SUBJECTS.forEach(function(s){
+    row.appendChild(el("a", {class:"tab", href:"#" + s.id, "aria-current": cur === s.id ? "page" : null}, s.name, el("span", {class:"n", text:String(counts[s.id] || 0)})));
+  });
+}
+function fileLabel(ext, size){
+  var bits = []; if (ext) bits.push(String(ext).toUpperCase());
+  var sz = fmtSize(size); if (sz) bits.push(sz);
+  return bits.join(" ");
+}
+function card(m){
+  var received = hasReceived(m), open = state.isAdmin || received, allowed = canGet(m);
+  var node = el("article", {class:"sheet"},
+    el("div", {class:"meta"},
+      el("span", {class:"tag", text:subjectName(m.subject)}),
+      el("time", {text:fmtDate(m.created_at)}),
+      (received && !state.isAdmin) ? el("span", {class:"pill", text:"받은 자료"}) : null,
+      state.isAdmin ? el("span", {text:"받은 사람 " + (state.counts[m.id] || 0) + "명"}) : null),
+    el("h2", {text:m.title || "제목 없음"}),
+    m.description ? el("p", {class:"desc", text:m.description}) : null
+  );
+  var row = el("div", {class:"row"}), mainBtn;
+  if (m.kind === "link"){
+    var href = open ? safeUrl(state.links[m.id]) : null;
+    if (href) mainBtn = el("a", {class:"btn primary", href:href, target:"_blank", rel:"noopener noreferrer"}, "아티팩트 열기");
+    else mainBtn = el("button", {class:"btn primary", type:"button", disabled:!allowed, onclick:function(){ onGet(m, mainBtn); }}, "아티팩트 열기");
+  } else {
+    var sub = fileLabel(m.file_ext, m.file_size);
+    mainBtn = el("button", {class:"btn primary", type:"button", disabled:!allowed, onclick:function(){ onGet(m, mainBtn); }}, "자료 받기", sub ? el("span", {class:"sub", text:sub}) : null);
+  }
+  row.appendChild(mainBtn);
+  if (m.answer_ext){
+    var asub = fileLabel(m.answer_ext, m.answer_size);
+    var ansBtn = el("button", {class:"btn", type:"button", onclick:function(){ onAnswer(m, ansBtn); }}, "답지 받기", asub ? el("span", {class:"sub", text:asub}) : null);
+    row.appendChild(ansBtn);
+  }
+  node.appendChild(row);
+  if (!allowed) node.appendChild(el("p", {class:"note", text:"이번 주 다운로드를 사용했어요. " + resetText() + "부터 받을 수 있어요."}));
+  if (state.isAdmin){
+    node.appendChild(el("div", {class:"row owner-row"},
+      el("button", {class:"btn quiet", type:"button", onclick:function(){ startEdit(m); }}, "수정"),
+      el("button", {class:"btn quiet danger", type:"button", onclick:function(){ onDelete(m); }}, "삭제")));
+  }
+  return node;
+}
+function renderList(){
+  var box = $("list"); box.replaceChildren();
+  var cur = currentSubject();
+  var items = state.materials.filter(function(m){ return !cur || m.subject === cur; });
+  if (!items.length){
+    var where = cur ? subjectName(cur) + " 자료가" : "자료가";
+    box.appendChild(el("p", {class:"empty", text: state.isAdmin ? where + " 아직 없어요. 위의 '새 자료 게시'에서 첫 자료를 올려 보세요." : where + " 아직 올라오지 않았어요."}));
+    return;
+  }
+  items.forEach(function(m){ box.appendChild(card(m)); });
+}
+function renderAll(){ renderStatus(); renderTabs(); renderList(); }
+
+/* ---------- getting files ---------- */
+function saveBlob(blob, name){
+  var url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = name || "자료"; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+}
+async function fetchFile(path, name){
+  var res = await sb.storage.from(BUCKET).download(path);
+  if (res.error || !res.data) throw (res.error || new Error("no file"));
+  saveBlob(res.data, name);
+}
+async function onGet(m, btn){
+  if (state.busy) return;
+  var first = !state.isAdmin && !hasReceived(m);
+  if (first){
+    var ok = await ask("이번 주 다운로드를 이 자료에 쓸까요?", "'" + (m.title || "") + "' 자료를 받으면 " + resetText() + "까지 다른 자료는 받을 수 없어요.", "받기");
+    if (!ok) return;
+  }
+  state.busy = true; if (btn) btn.disabled = true;
+  try {
+    var res = await sb.rpc("claim_download", {p_material:m.id});
+    if (res.error) throw res.error;
+    var d = res.data || {};
+    if (!d.ok){
+      if (d.reason === "limit"){ state.nextReset = d.next_reset; toast("이번 주 다운로드를 이미 사용했어요. " + resetText() + "부터 받을 수 있어요."); }
+      else toast("이 자료는 지금 받을 수 없어요. 목록을 새로 고쳐 주세요.");
+      return;
+    }
+    if (m.kind === "link"){
+      if (d.url) state.links[m.id] = d.url;
+      toast("이제 '아티팩트 열기'를 누르면 열려요.");
+    } else {
+      await fetchFile("main/" + m.id + "/file." + m.file_ext, m.file_name || ("자료." + m.file_ext));
+      toast("자료를 저장했어요.");
+    }
+  } catch (e) {
+    if (needsPin(e)){ setPinMode("verify"); return; }
+    toast("자료를 받지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+  } finally {
+    state.busy = false;
+    try { await loadQuota(); } catch (e2) {}
+    if (!$("viewApp").hidden) renderAll();
+  }
+}
+async function onAnswer(m, btn){
+  if (state.busy) return;
+  state.busy = true; if (btn) btn.disabled = true;
+  try { await fetchFile("answers/" + m.id + "/file." + m.answer_ext, m.answer_name || ("답지." + m.answer_ext)); toast("답지를 저장했어요."); }
+  catch (e) { toast("답지를 받지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+  finally { state.busy = false; if (btn) btn.disabled = false; }
+}
+
+/* ---------- posting (the server accepts this from the operator account only) ---------- */
+function formMsg(text, isErr){ var p = $("formMsg"); p.textContent = text || ""; p.className = isErr ? "err" : ""; }
+function fileInfo(file){
+  var m = /\.([A-Za-z0-9]+)$/.exec(file.name || "");
+  var ext = m ? m[1].toLowerCase() : "";
+  if (!FILE_TYPES[ext]) return null;
+  return {ext: ext === "htm" ? "html" : (ext === "jpeg" ? "jpg" : ext), type:FILE_TYPES[ext]};
+}
+function checkFile(file){
+  if (!fileInfo(file)) return "PDF, HTML, 이미지(PNG, JPG, WEBP), MD, TXT 파일만 올릴 수 있어요.";
+  if (!(file.size > 0)) return "빈 파일이에요. 다른 파일을 골라 주세요.";
+  if (file.size > MAX_BYTES) return "파일이 50MB를 넘어요. 용량을 줄여서 다시 올려 주세요.";
+  return "";
+}
+function newId(){
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  var b = new Uint8Array(16); crypto.getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  var h = Array.prototype.map.call(b, function(x){ return ("0" + x.toString(16)).slice(-2); }).join("");
+  return h.slice(0,8) + "-" + h.slice(8,12) + "-" + h.slice(12,16) + "-" + h.slice(16,20) + "-" + h.slice(20);
+}
+function setFormBusy(b){ state.busy = b; $("fSubmit").disabled = b; $("fCancel").disabled = b; }
+function syncKind(){ var link = $("fKindLink").checked; $("fileWrap").hidden = link; $("linkWrap").hidden = !link; }
+function resetForm(){
+  state.editingId = null; $("postForm").reset();
+  var cur = currentSubject(); if (cur) $("fSubject").value = cur;
+  $("fileSection").hidden = false; $("fCancel").hidden = true;
+  $("fSubmit").textContent = "게시하기"; $("postSummary").textContent = "새 자료 게시"; syncKind();
+}
+function startEdit(m){
+  state.editingId = m.id;
+  $("fSubject").value = m.subject; $("fTitle").value = m.title || ""; $("fDesc").value = m.description || "";
+  $("fileSection").hidden = true; $("fCancel").hidden = false;
+  $("fSubmit").textContent = "수정 저장"; $("postSummary").textContent = "자료 수정";
+  formMsg("제목, 과목, 설명을 고칠 수 있어요. 파일을 바꾸려면 삭제한 뒤 새로 게시해 주세요.");
+  var box = $("postBox"); box.open = true;
+  try { box.scrollIntoView({block:"start"}); } catch (e) {}
+  $("fTitle").focus();
+}
+function postErrorText(e){
+  if (needsPin(e)) return "비밀번호 확인이 만료됐어요. 페이지를 새로 고쳐 다시 들어와 주세요.";
+  var m = String((e && e.message) || "");
+  if (/row-level security|permission|not authorized|Unauthorized/i.test(m)) return "게시 권한이 없어요. 자료는 운영자 계정만 게시할 수 있어요.";
+  if (/exceeded|too large|size/i.test(m)) return "파일이 너무 커요. 50MB 이하로 줄여 주세요.";
+  if (/mime|type/i.test(m)) return "이 파일 형식은 올릴 수 없어요. PDF나 HTML 파일인지 확인해 주세요.";
+  return "게시하지 못했어요. 잠시 뒤 다시 시도해 주세요.";
+}
+async function onSubmit(ev){
+  ev.preventDefault();
+  if (state.busy) return;
+  var subject = $("fSubject").value, title = $("fTitle").value.trim(), desc = $("fDesc").value.trim();
+  if (!title){ formMsg("제목을 입력해 주세요.", true); $("fTitle").focus(); return; }
+
+  if (state.editingId){
+    setFormBusy(true);
+    try {
+      var up = await sb.from("materials").update({subject:subject, title:title, description:desc}).eq("id", state.editingId).select("id");
+      if (up.error) throw up.error;
+      if (!up.data || !up.data.length) throw new Error("permission");
+      resetForm(); formMsg("수정했어요."); await refresh();
+    } catch (e) { formMsg(postErrorText(e), true); }
+    finally { setFormBusy(false); }
+    return;
+  }
+
+  var kind = $("fKindLink").checked ? "link" : "file";
+  var file = $("fFile").files[0], ans = $("fAnswer").files[0], link = null, err;
+  if (kind === "file"){
+    if (!file){ formMsg("게시할 자료 파일을 골라 주세요.", true); return; }
+    err = checkFile(file); if (err){ formMsg("자료 파일: " + err, true); return; }
+  } else {
+    link = safeUrl($("fLink").value.trim());
+    if (!link){ formMsg("https://로 시작하는 아티팩트 링크를 넣어 주세요.", true); return; }
+  }
+  if (ans){ err = checkFile(ans); if (err){ formMsg("답지 파일: " + err, true); return; } }
+
+  setFormBusy(true);
+  var id = newId(), uploaded = [], rowMade = false;
+  try {
+    var row = {id:id, subject:subject, title:title, description:desc, kind:kind};
+    if (kind === "file"){
+      var fi = fileInfo(file), mainPath = "main/" + id + "/file." + fi.ext;
+      formMsg("자료 파일을 올리는 중이에요.");
+      var u1 = await sb.storage.from(BUCKET).upload(mainPath, file, {contentType:fi.type, upsert:false});
+      if (u1.error) throw u1.error;
+      uploaded.push(mainPath);
+      row.file_ext = fi.ext; row.file_name = String(file.name).slice(0, 200); row.file_size = file.size;
+    }
+    if (ans){
+      var ai = fileInfo(ans), ansPath = "answers/" + id + "/file." + ai.ext;
+      formMsg("답지를 올리는 중이에요.");
+      var u2 = await sb.storage.from(BUCKET).upload(ansPath, ans, {contentType:ai.type, upsert:false});
+      if (u2.error) throw u2.error;
+      uploaded.push(ansPath);
+      row.answer_ext = ai.ext; row.answer_name = String(ans.name).slice(0, 200); row.answer_size = ans.size;
+    }
+    formMsg("게시하는 중이에요.");
+    var ins = await sb.from("materials").insert(row);
+    if (ins.error) throw ins.error;
+    rowMade = true;
+    if (kind === "link"){
+      var li = await sb.from("material_links").insert({material_id:id, url:link});
+      if (li.error) throw li.error;
+    }
+    resetForm(); formMsg("게시했어요. 아래 목록에서 확인해 보세요."); await refresh();
+  } catch (e) {
+    if (uploaded.length){ try { await sb.storage.from(BUCKET).remove(uploaded); } catch (x) {} }
+    if (rowMade){ try { await sb.from("materials").delete().eq("id", id); } catch (x2) {} }
+    formMsg(postErrorText(e), true);
+  } finally { setFormBusy(false); }
+}
+async function onDelete(m){
+  if (state.busy) return;
+  var ok = await ask("이 자료를 삭제할까요?", "'" + (m.title || "") + "' 자료와 파일, 답지가 모두 지워지고 되돌릴 수 없어요.", "삭제");
+  if (!ok) return;
+  state.busy = true;
+  try {
+    var del = await sb.from("materials").delete().eq("id", m.id).select("id");
+    if (del.error) throw del.error;
+    if (!del.data || !del.data.length) throw new Error("permission");
+    var paths = [];
+    if (m.file_ext) paths.push("main/" + m.id + "/file." + m.file_ext);
+    if (m.answer_ext) paths.push("answers/" + m.id + "/file." + m.answer_ext);
+    if (paths.length){ try { await sb.storage.from(BUCKET).remove(paths); } catch (x) {} }
+    if (state.editingId === m.id) resetForm();
+    toast("삭제했어요.");
+  } catch (e) { toast("삭제하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+  finally { state.busy = false; await refresh(); }
+}
+
+/* ---------- change PIN ---------- */
+function openPinDialog(){
+  $("cpOld").value = ""; $("cpNew").value = ""; $("cpMsg").textContent = "";
+  try { $("pinDlg").showModal(); } catch (e) { $("pinDlg").setAttribute("open", ""); }
+}
+function closePinDialog(){ try { $("pinDlg").close(); } catch (e) { $("pinDlg").removeAttribute("open"); } }
+async function onChangePin(ev){
+  ev.preventDefault();
+  var o = $("cpOld").value.trim(), n = $("cpNew").value.trim(), msg = $("cpMsg");
+  if (!/^[0-9]{4}$/.test(o) || !/^[0-9]{4}$/.test(n)){ msg.textContent = "둘 다 숫자 4자리로 입력해 주세요."; return; }
+  var res = await sb.rpc("change_pin", {p_old:o, p_new:n});
+  if (res.error){ msg.textContent = "변경하지 못했어요. 잠시 뒤 다시 시도해 주세요."; return; }
+  var d = res.data || {};
+  if (d.ok){ closePinDialog(); toast("비밀번호를 바꿨어요."); return; }
+  if (d.reason === "wrong") msg.textContent = "지금 비밀번호가 달라요. " + d.attempts_left + "번 더 틀리면 15분 동안 잠겨요.";
+  else if (d.reason === "locked") msg.textContent = "5번 틀려서 잠겼어요. " + fmtTime(d.locked_until) + " 이후에 다시 시도해 주세요.";
+  else msg.textContent = "숫자 4자리로 입력해 주세요.";
+}
+
+/* ---------- start ---------- */
+async function init(){
+  var sel = $("fSubject");
+  SUBJECTS.forEach(function(s){ sel.appendChild(el("option", {value:s.id, text:s.name})); });
+  $("btnGoogle").addEventListener("click", signIn);
+  $("btnLogout").addEventListener("click", signOut);
+  $("pinLogout").addEventListener("click", signOut);
+  $("pinForm").addEventListener("submit", onPinSubmit);
+  $("postForm").addEventListener("submit", onSubmit);
+  $("fCancel").addEventListener("click", function(){ resetForm(); formMsg(""); });
+  $("fKindFile").addEventListener("change", syncKind);
+  $("fKindLink").addEventListener("change", syncKind);
+  $("btnChangePin").addEventListener("click", openPinDialog);
+  $("cpCancel").addEventListener("click", closePinDialog);
+  $("pinDlgForm").addEventListener("submit", onChangePin);
+  window.addEventListener("hashchange", function(){
+    if ($("viewApp").hidden) return;
+    var cur = currentSubject();
+    if (cur && !state.editingId && !$("fTitle").value) $("fSubject").value = cur;
+    renderTabs(); renderList();
+  });
+
+  if (!window.supabase || !window.supabase.createClient){
+    show("viewLogin"); $("btnGoogle").disabled = true;
+    $("loginMsg").textContent = "사이트에 필요한 파일을 불러오지 못했어요. 인터넷 연결을 확인하고 새로 고쳐 주세요.";
+    return;
+  }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth:{flowType:"pkce", detectSessionInUrl:true, persistSession:true, autoRefreshToken:true}
+  });
+  var params = new URLSearchParams(location.search), oauthErr = params.get("error_description");
+  var res = await sb.auth.getSession();
+  if (res.data && res.data.session) await afterLogin();
+  else {
+    show("viewLogin");
+    if (oauthErr) $("loginMsg").textContent = "로그인이 완료되지 않았어요. 다시 시도해 주세요. (" + oauthErr + ")";
+  }
+}
+init();
+</script>
+</body>
+</html>
