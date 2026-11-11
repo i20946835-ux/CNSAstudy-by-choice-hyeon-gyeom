@@ -98,6 +98,14 @@ fieldset{border:1px dashed var(--line); border-radius:6px; margin:0; padding:10p
 .tag{font:600 12.5px var(--font-body); color:var(--ink); background:var(--mark); padding:1px 7px; border-radius:3px}
 .pill{font:600 12px var(--font-body); color:var(--ok); border:1px solid currentColor; border-radius:99px; padding:0 8px}
 .sheet h2{font-family:var(--font-display); font-weight:700; font-size:18.5px; line-height:1.35; margin:0; text-wrap:balance; overflow-wrap:anywhere}
+.cardhead{display:flex; gap:12px; align-items:flex-start}
+.cardtext{display:flex; flex-direction:column; gap:8px; min-width:0; flex:1}
+.thumb{flex:none; width:96px; aspect-ratio:3 / 4; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:var(--paper); padding:0; display:block; cursor:zoom-in}
+.thumb img{width:100%; height:100%; object-fit:cover; object-position:top center; display:block}
+.thumb.ph{cursor:default; display:flex; align-items:flex-end; padding:8px; border-left:5px solid var(--bar, var(--accent)); font:500 12px var(--font-mono); color:var(--muted)}
+#previewDlg{width:min(94vw, 560px); padding:10px}
+#previewDlg img{display:block; width:100%; max-height:76vh; object-fit:contain; background:var(--paper); border-radius:6px}
+#previewDlg .row{margin-top:10px}
 .desc{margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:15px; max-width:65ch}
 .note{margin:0; font-size:13px; color:var(--warn)}
 .sheet .row{margin-top:4px}
@@ -132,7 +140,7 @@ dialog .field{margin-bottom:12px}
 .foot{display:flex; gap:16px; margin-top:40px; padding-top:14px; border-top:1px solid var(--line); font-size:13.5px}
 .foot a{color:var(--muted)}
 .credit{margin:14px 0 0; font:400 12.5px var(--font-mono); color:var(--muted)}
-@media (max-width:400px){ h1{font-size:23px} .sheet > .row > .btn{width:100%} }
+@media (max-width:400px){ h1{font-size:23px} .sheet > .row:not(.owner-row) > .btn{width:100%} }
 @media (prefers-reduced-motion:reduce){ *{scroll-behavior:auto !important; transition:none !important} }
 </style>
 </head>
@@ -160,6 +168,7 @@ dialog .field{margin-bottom:12px}
     <h2>Google 계정으로 로그인해 주세요</h2>
     <p>직접 만든 정리 자료와 문제를 과목별로 모아 둔 곳이에요. 로그인한 뒤 4자리 비밀번호를 입력하면 자료를 볼 수 있어요.</p>
     <button type="button" class="btn primary" id="btnGoogle">Google 계정으로 로그인</button>
+    <p class="msg" id="inAppMsg" hidden>앱 안에서 열린 화면에서는 Google 로그인이 막힐 수 있어요. Chrome이나 삼성 인터넷에서 열어 주세요. <a id="inAppOpen" href="#">다른 브라우저로 열기</a></p>
     <p class="msg" id="loginMsg" role="status"></p>
   </section>
 
@@ -226,6 +235,11 @@ dialog .field{margin-bottom:12px}
             <input id="fAnswer" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp,.md,.txt">
           </div>
         </fieldset>
+        <div class="field">
+          <label for="fThumb">미리보기 이미지 (선택)</label>
+          <input id="fThumb" type="file" accept="image/png,image/jpeg,image/webp">
+          <p class="hint">자료 목록에 보이는 작은 그림이에요. PDF는 비워 두면 첫 페이지로 자동으로 만들어요. 아티팩트는 화면 캡처를 올려 주세요.</p>
+        </div>
         <p id="formMsg" class="formmsg" role="status"></p>
         <div class="row">
           <button type="submit" id="fSubmit" class="btn primary">게시하기</button>
@@ -313,6 +327,10 @@ dialog .field{margin-bottom:12px}
     </div>
   </form>
 </dialog>
+<dialog id="previewDlg" aria-label="자료 미리보기">
+  <img id="previewImg" alt="">
+  <div class="row"><button type="button" id="previewClose" class="btn">닫기</button></div>
+</dialog>
 <div id="toast" role="status" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
@@ -332,12 +350,14 @@ var FILE_TYPES = {
   jpg:"image/jpeg", jpeg:"image/jpeg", webp:"image/webp", md:"text/markdown", txt:"text/plain"
 };
 var MAX_BYTES = 50 * 1024 * 1024;
+var THUMB_W = 480;
+var PDFJS_BASE = "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/";
 
 var sb = null;
 var state = {
   isAdmin:false, pinMode:"verify", materials:[], links:{}, counts:{},
   received:{}, used:0, limit:1, nextReset:null, busy:false, editingId:null, postBoxSet:false,
-  social:{}, comments:{}, openComments:{},
+  social:{}, comments:{}, openComments:{}, thumbUrls:{},
   board:{category:"inquiry", posts:{inquiry:null, review:null}}
 };
 
@@ -434,7 +454,7 @@ async function signIn(){
 async function signOut(){
   try { await sb.auth.signOut(); } catch (e) {}
   state.materials = []; state.links = {}; state.received = {}; state.isAdmin = false;
-  state.social = {}; state.comments = {}; state.openComments = {};
+  state.social = {}; state.comments = {}; state.openComments = {}; state.thumbUrls = {};
   state.board.posts = {inquiry:null, review:null};
   show("viewLogin");
 }
@@ -506,11 +526,22 @@ async function loadAll(){
   state.links = {};
   ((got[1] && got[1].data) || []).forEach(function(r){ state.links[r.material_id] = r.url; });
   state.social = (got[3] && !got[3].error && got[3].data) || {};
+  await loadThumbs();
   state.counts = {};
   if (state.isAdmin){
     var c = await sb.rpc("download_counts");
     if (!c.error && c.data) state.counts = c.data;
   }
+}
+async function loadThumbs(){
+  var need = state.materials.filter(function(m){ return m.has_thumb && !state.thumbUrls[m.id]; });
+  if (!need.length) return;
+  try {
+    var paths = need.map(function(m){ return "thumbs/" + m.id + "/thumb.jpg"; });
+    var res = await sb.storage.from(BUCKET).createSignedUrls(paths, 21600);
+    if (res.error || !res.data) return;
+    res.data.forEach(function(r, i){ if (r && r.signedUrl && !r.error && need[i]) state.thumbUrls[need[i].id] = r.signedUrl; });
+  } catch (e) {}
 }
 async function enterApp(){
   show("viewLoading");
@@ -590,22 +621,44 @@ function authorLine(a, iso){
     el("span", {class:"mail", text:a.email || ""}),
     el("time", {text:fmtDateTime(iso)}));
 }
+function subjectColor(id){
+  for (var i = 0; i < SUBJECTS.length; i++) if (SUBJECTS[i].id === id) return SUBJECTS[i].color;
+  return "";
+}
+function placeholderThumb(m){
+  var label = m.kind === "link" ? "LINK" : String(m.file_ext || "FILE").toUpperCase();
+  return el("div", {class:"thumb ph", style:"--bar:" + subjectColor(m.subject), "aria-hidden":"true"}, label);
+}
+function openPreview(m, url){
+  var img = $("previewImg"); img.src = url; img.alt = (m.title || "자료") + " 미리보기";
+  try { $("previewDlg").showModal(); } catch (e) { $("previewDlg").setAttribute("open", ""); }
+}
+function closePreview(){ try { $("previewDlg").close(); } catch (e) { $("previewDlg").removeAttribute("open"); } }
+function thumbNode(m){
+  var url = m.has_thumb ? state.thumbUrls[m.id] : null;
+  if (!url) return placeholderThumb(m);
+  var img = el("img", {src:url, alt:"", loading:"lazy"});
+  var b = el("button", {class:"thumb", type:"button", "aria-label":(m.title || "자료") + " 미리보기 크게 보기", onclick:function(){ openPreview(m, url); }}, img);
+  img.addEventListener("error", function(){ if (b.parentNode) b.parentNode.replaceChild(placeholderThumb(m), b); });
+  return b;
+}
 function card(m){
-  var received = hasReceived(m), open = state.isAdmin || received, allowed = canGet(m);
+  var received = hasReceived(m), allowed = canGet(m);
   var node = el("article", {class:"sheet"},
-    el("div", {class:"meta"},
-      el("span", {class:"tag", text:subjectName(m.subject)}),
-      el("time", {text:fmtDate(m.created_at)}),
-      (received && !state.isAdmin) ? el("span", {class:"pill", text:"받은 자료"}) : null,
-      state.isAdmin ? el("span", {text:"받은 사람 " + (state.counts[m.id] || 0) + "명"}) : null),
-    el("h2", {text:m.title || "제목 없음"}),
-    m.description ? el("p", {class:"desc", text:m.description}) : null
+    el("div", {class:"cardhead"},
+      thumbNode(m),
+      el("div", {class:"cardtext"},
+        el("div", {class:"meta"},
+          el("span", {class:"tag", text:subjectName(m.subject)}),
+          el("time", {text:fmtDate(m.created_at)}),
+          (received && !state.isAdmin) ? el("span", {class:"pill", text:"받은 자료"}) : null,
+          state.isAdmin ? el("span", {text:"받은 사람 " + (state.counts[m.id] || 0) + "명"}) : null),
+        el("h2", {text:m.title || "제목 없음"}),
+        m.description ? el("p", {class:"desc", text:m.description}) : null))
   );
   var row = el("div", {class:"row"}), mainBtn;
   if (m.kind === "link"){
-    var href = open ? safeUrl(state.links[m.id]) : null;
-    if (href) mainBtn = el("a", {class:"btn primary", href:href, target:"_blank", rel:"noopener noreferrer"}, "아티팩트 열기");
-    else mainBtn = el("button", {class:"btn primary", type:"button", disabled:!allowed, onclick:function(){ onGet(m, mainBtn); }}, "아티팩트 열기");
+    mainBtn = el("button", {class:"btn primary", type:"button", disabled:!allowed, onclick:function(){ onGet(m, mainBtn); }}, "아티팩트 열기");
   } else {
     var sub = fileLabel(m.file_ext, m.file_size);
     mainBtn = el("button", {class:"btn primary", type:"button", disabled:!allowed, onclick:function(){ onGet(m, mainBtn); }}, "자료 받기", sub ? el("span", {class:"sub", text:sub}) : null);
@@ -868,12 +921,24 @@ async function fetchFile(path, name){
   if (res.error || !res.data) throw (res.error || new Error("no file"));
   saveBlob(res.data, name);
 }
+function openLink(url){
+  var w = null;
+  try { w = window.open(url, "_blank"); if (w) w.opener = null; } catch (e) {}
+  return !!w;
+}
 async function onGet(m, btn){
   if (state.busy) return;
-  var first = !state.isAdmin && !hasReceived(m);
-  if (first){
-    var ok = await ask("이번 주 다운로드를 이 자료에 쓸까요?", "'" + (m.title || "") + "' 자료를 받으면 " + resetText() + "까지 다른 자료는 받을 수 없어요.", "받기");
-    if (!ok) return;
+  var first = !state.isAdmin && !hasReceived(m), isLink = (m.kind === "link"), name = "'" + (m.title || "자료") + "'", ok;
+  if (first) ok = await ask("이번 주 다운로드를 이 자료에 쓸까요?", name + " 자료를 " + (isLink ? "열면 " : "받으면 ") + resetText() + "까지 다른 자료는 받을 수 없어요.", isLink ? "열기" : "받기");
+  else if (isLink) ok = await ask("이 자료를 열까요?", name + " 자료가 새 탭에서 열려요.", "열기");
+  else ok = await ask("이 자료를 받을까요?", name + " 파일을 이 기기에 저장해요.", "받기");
+  if (!ok) return;
+  if (isLink && !first){
+    var known = safeUrl(state.links[m.id]);
+    if (known){
+      if (!openLink(known)) toast("브라우저가 새 탭을 막았어요. 팝업 차단을 풀고 다시 눌러 주세요.");
+      return;
+    }
   }
   state.busy = true; if (btn) btn.disabled = true;
   try {
@@ -885,9 +950,11 @@ async function onGet(m, btn){
       else toast("이 자료는 지금 받을 수 없어요. 목록을 새로 고쳐 주세요.");
       return;
     }
-    if (m.kind === "link"){
-      if (d.url) state.links[m.id] = d.url;
-      toast("이제 '아티팩트 열기'를 누르면 열려요.");
+    if (isLink){
+      var url = safeUrl(d.url);
+      if (url) state.links[m.id] = url;
+      if (!url) toast("이 자료의 링크가 올바르지 않아요. 운영자에게 알려 주세요.");
+      else if (!openLink(url)) toast("새 탭이 막혔어요. '아티팩트 열기'를 한 번 더 눌러 주세요.");
     } else {
       await fetchFile("main/" + m.id + "/file." + m.file_ext, m.file_name || ("자료." + m.file_ext));
       toast("자료를 저장했어요.");
@@ -923,6 +990,56 @@ function checkFile(file){
   if (file.size > MAX_BYTES) return "파일이 50MB를 넘어요. 용량을 줄여서 다시 올려 주세요.";
   return "";
 }
+function canvasToJpeg(canvas){
+  return new Promise(function(resolve, reject){
+    canvas.toBlob(function(b){ if (b) resolve(b); else reject(new Error("thumb")); }, "image/jpeg", 0.85);
+  });
+}
+async function thumbFromImage(file){
+  var bmp = await createImageBitmap(file);
+  var scale = Math.min(1, THUMB_W / bmp.width);
+  var c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(bmp.width * scale)); c.height = Math.max(1, Math.round(bmp.height * scale));
+  var ctx = c.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  if (bmp.close) bmp.close();
+  return canvasToJpeg(c);
+}
+async function thumbFromPdf(file){
+  var lib = await import(PDFJS_BASE + "legacy/build/pdf.min.mjs");
+  lib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + "legacy/build/pdf.worker.min.mjs";
+  var task = lib.getDocument({
+    data:new Uint8Array(await file.arrayBuffer()),
+    cMapUrl:PDFJS_BASE + "cmaps/", cMapPacked:true,
+    standardFontDataUrl:PDFJS_BASE + "standard_fonts/"
+  });
+  try {
+    var pdf = await task.promise;
+    var page = await pdf.getPage(1);
+    var vp = page.getViewport({scale: THUMB_W / page.getViewport({scale:1}).width});
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(vp.width)); c.height = Math.max(1, Math.round(vp.height));
+    var ctx = c.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({canvasContext:ctx, canvas:c, viewport:vp}).promise;
+    return await canvasToJpeg(c);
+  } finally { try { await task.destroy(); } catch (e) {} }
+}
+async function makeThumb(thumbFile, mainFile, kind){
+  if (thumbFile) return thumbFromImage(thumbFile);
+  if (kind === "file" && mainFile){
+    var fi = fileInfo(mainFile);
+    if (fi && fi.ext === "pdf") return thumbFromPdf(mainFile);
+    if (fi && (fi.ext === "png" || fi.ext === "jpg" || fi.ext === "webp")) return thumbFromImage(mainFile);
+  }
+  return null;
+}
+function checkThumb(file){
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type || "")) return "미리보기 이미지는 PNG, JPG, WEBP 파일만 쓸 수 있어요.";
+  if (file.size > 20 * 1024 * 1024) return "미리보기 이미지가 20MB를 넘어요.";
+  return "";
+}
 function newId(){
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
   var b = new Uint8Array(16); crypto.getRandomValues(b);
@@ -943,7 +1060,7 @@ function startEdit(m){
   $("fSubject").value = m.subject; $("fTitle").value = m.title || ""; $("fDesc").value = m.description || "";
   $("fileSection").hidden = true; $("fCancel").hidden = false;
   $("fSubmit").textContent = "수정 저장"; $("postSummary").textContent = "자료 수정";
-  formMsg("제목, 과목, 설명을 고칠 수 있어요. 파일을 바꾸려면 삭제한 뒤 새로 게시해 주세요.");
+  formMsg("제목, 과목, 설명, 미리보기 이미지를 고칠 수 있어요. 자료 파일을 바꾸려면 삭제한 뒤 새로 게시해 주세요.");
   var box = $("postBox"); box.open = true;
   try { box.scrollIntoView({block:"start"}); } catch (e) {}
   $("fTitle").focus();
@@ -961,11 +1078,22 @@ async function onSubmit(ev){
   if (state.busy) return;
   var subject = $("fSubject").value, title = $("fTitle").value.trim(), desc = $("fDesc").value.trim();
   if (!title){ formMsg("제목을 입력해 주세요.", true); $("fTitle").focus(); return; }
+  var tf = $("fThumb").files[0];
+  if (tf){ var terr = checkThumb(tf); if (terr){ formMsg(terr, true); return; } }
 
   if (state.editingId){
     setFormBusy(true);
     try {
-      var up = await sb.from("materials").update({subject:subject, title:title, description:desc}).eq("id", state.editingId).select("id");
+      var eid = state.editingId, patch = {subject:subject, title:title, description:desc};
+      if (tf){
+        formMsg("미리보기 이미지를 올리는 중이에요.");
+        var eblob = await thumbFromImage(tf);
+        var eup = await sb.storage.from(BUCKET).upload("thumbs/" + eid + "/thumb.jpg", eblob, {contentType:"image/jpeg", upsert:true});
+        if (eup.error) throw eup.error;
+        patch.has_thumb = true;
+        delete state.thumbUrls[eid];
+      }
+      var up = await sb.from("materials").update(patch).eq("id", eid).select("id");
       if (up.error) throw up.error;
       if (!up.data || !up.data.length) throw new Error("permission");
       resetForm(); formMsg("수정했어요."); await refresh();
@@ -1005,6 +1133,17 @@ async function onSubmit(ev){
       uploaded.push(ansPath);
       row.answer_ext = ai.ext; row.answer_name = String(ans.name).slice(0, 200); row.answer_size = ans.size;
     }
+    var thumbNote = "";
+    try {
+      formMsg("미리보기 이미지를 만드는 중이에요.");
+      var tblob = await makeThumb(tf, file, kind);
+      if (tblob){
+        var tpath = "thumbs/" + id + "/thumb.jpg";
+        var u3 = await sb.storage.from(BUCKET).upload(tpath, tblob, {contentType:"image/jpeg", upsert:false});
+        if (u3.error) throw u3.error;
+        uploaded.push(tpath); row.has_thumb = true;
+      }
+    } catch (te) { thumbNote = " 미리보기 이미지는 만들지 못했어요. '수정'에서 직접 올릴 수 있어요."; }
     formMsg("게시하는 중이에요.");
     var ins = await sb.from("materials").insert(row);
     if (ins.error) throw ins.error;
@@ -1013,7 +1152,7 @@ async function onSubmit(ev){
       var li = await sb.from("material_links").insert({material_id:id, url:link});
       if (li.error) throw li.error;
     }
-    resetForm(); formMsg("게시했어요. " + subjectName(subject) + " 과목에서 확인해 보세요."); await refresh();
+    resetForm(); formMsg("게시했어요. " + subjectName(subject) + " 과목에서 확인해 보세요." + thumbNote); await refresh();
   } catch (e) {
     if (uploaded.length){ try { await sb.storage.from(BUCKET).remove(uploaded); } catch (x) {} }
     if (rowMade){ try { await sb.from("materials").delete().eq("id", id); } catch (x2) {} }
@@ -1032,6 +1171,7 @@ async function onDelete(m){
     var paths = [];
     if (m.file_ext) paths.push("main/" + m.id + "/file." + m.file_ext);
     if (m.answer_ext) paths.push("answers/" + m.id + "/file." + m.answer_ext);
+    if (m.has_thumb) paths.push("thumbs/" + m.id + "/thumb.jpg");
     if (paths.length){ try { await sb.storage.from(BUCKET).remove(paths); } catch (x) {} }
     if (state.editingId === m.id) resetForm();
     toast("삭제했어요.");
@@ -1076,6 +1216,14 @@ async function init(){
   $("catInquiry").addEventListener("click", function(){ setCategory("inquiry"); });
   $("catReview").addEventListener("click", function(){ setCategory("review"); });
   $("boardForm").addEventListener("submit", onBoardSubmit);
+  $("previewClose").addEventListener("click", closePreview);
+  $("previewDlg").addEventListener("click", function(ev){ if (ev.target === $("previewDlg")) closePreview(); });
+  var ua = navigator.userAgent || "";
+  if (/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV| Line\//i.test(ua)){
+    $("inAppMsg").hidden = false;
+    if (/KAKAOTALK/i.test(ua)) $("inAppOpen").href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(location.href);
+    else $("inAppOpen").hidden = true;
+  }
   window.addEventListener("hashchange", function(){
     if ($("viewApp").hidden) return;
     var cur = currentSubject();
